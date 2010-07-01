@@ -1,0 +1,123 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+use Bio::Seq;
+use Bio::SeqIO;
+
+use Bio::SeqFeatureI;
+
+my $gbk_file = $ARGV[0];
+my $gbk	= Bio::SeqIO->new('-file' => $gbk_file);
+
+my $genes = 0;
+my $transcripts = 0;
+
+my %gene_transcripts;
+
+my %transcript_introns;
+my %transcript_exons;
+
+my @intron_length;
+my @exon_length;
+
+# parse file and count features
+
+while (	my $seq = $gbk->next_seq() ) {
+
+    my @features = $seq->get_SeqFeatures(); # just top level
+    foreach my $feat ( @features ) {
+
+        if($feat->primary_tag eq 'gene') {
+	    my $gene_id;
+            if( $feat->has_tag("ID") ) {
+		($gene_id) = ($feat->get_all_values('ID'));
+		$genes++;
+            }
+        }
+
+	if($feat->primary_tag eq 'transcript') {
+	    my $gene_id;
+                #parent = g1; ID =
+            if( $feat->has_tag("parent") ) {
+                ($gene_id) = ($feat->get_all_values('parent'));
+		
+            }
+            if( $feat->has_tag("ID") ) {
+                my ($transcript_id) = ($feat->get_all_values('ID'));
+		if(defined($gene_id)) {
+		    $gene_transcripts{$gene_id}++;
+		}
+		$transcripts++;
+	    }
+	}
+
+        if($feat->primary_tag eq 'exon') {
+            # parent =g1.t1
+            if( $feat->has_tag("parent") ) {
+                my ($transcript_id) = ($feat->get_all_values('parent'));
+
+		if (defined($transcript_exons{$transcript_id})) {
+		    $transcript_exons{$transcript_id}++;
+		} else {
+		    $transcript_exons{$transcript_id}=1;
+		}
+
+		push @exon_length,$feat->length;
+            }
+        }
+	    
+	if($feat->primary_tag eq 'intron') {
+            if( $feat->has_tag("parent") ) {
+                my ($transcript_id) = ($feat->get_all_values('parent'));
+
+		if (defined($transcript_introns{$transcript_id})) {
+		    $transcript_introns{$transcript_id}++;
+		} else {
+		    $transcript_introns{$transcript_id}=1;
+		}
+		
+		push(@intron_length,$feat->length);
+            }
+        }
+    }
+}
+
+# calculate 
+my ($exon_mean_length, $exon_median_length) = (mean_and_median(@exon_length));
+my ($intron_mean_length, $intron_median_length) = (mean_and_median(@intron_length));
+
+my $exons = scalar( @exon_length );
+my $introns = scalar( @intron_length );
+
+# print
+
+print "$genes genes, $transcripts transcripts\n";
+
+print "$exons exons:mean length\t$exon_mean_length:\tmedian length\t$exon_median_length.\n";
+print "$introns exons:mean length\t$exon_mean_length:\tmedian length\t$exon_median_length.\n";
+
+sub mean_and_median {
+
+    use POSIX; 
+
+    my $sum=0; 
+    my $n=0;
+    my @val=@_;
+
+    while(my $r=<STDIN>) {
+	chomp $r; 
+	$sum+=$r; 
+	$n++; 
+	push @val,$r;
+    } 
+
+    my $median;
+    if ($n%2==0){ 
+	$median = ($val[floor($n/2)-1]+$val[floor($n/2)])/2;
+    } else { 
+	$median = $val[$n/2-1];
+    } 
+
+    return(sprintf("%.3f",$sum/$n), $median);
+}

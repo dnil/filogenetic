@@ -1,0 +1,179 @@
+# cluster ESTs before alignment
+
+../src/phrap/phrap dimmitis_ests_entrez_2009-09-29.fasta -ace
+
+cat dimmitis_ests_entrez_2009-09-29.fasta.contigs dimmitis_ests_entrez_2009-09-29.fasta.singlets > dimmitis_ests_entrez_2009-09-29.clusters
+
+
+# use the ESTs to assess assembly completeness & fragmentation
+
+./add_length_to_fasta_name.pl < dimmitis_ests_entrez_2009-09-29.fasta >dimmitis_ests_entrez_2009-09-29.with_len.fasta
+
+perl -ne 's/_length_\d+//; print'< 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.fasta > 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.wo_lengths.fasta
+
+../src/blast-2.2.20/bin/formatdb -i 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.wo_lengths.fasta -p F
+
+../src/blast-2.2.20/bin/blastall -p blastn -i dimmitis_ests_entrez_2009-09-29.with_len.fasta -d 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.wo_lengths.fasta -o dimmitis_ests_entrez_2009-09-29_vs_2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.estlen.m8.bln -m8
+
+./check_guide_coverage.pl < dimmitis_ests_entrez_2009-09-29_vs_2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.estlen.m8.bln > dimmitis_ests_entrez_2009-09-29_vs_2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.estlen.m8.guidecover
+
+guidecover=dimmitis_ests_entrez_2009-09-29_vs_2009-12-07_GEU-1_velvet-h31_SCF.estlen.m8.guidecover
+
+grep -c FOUND_OK $guidecover
+grep FOUND_OK $guidecover |awk '($5 >1) {print}' |wc -l
+grep FOUND_OK $guidecover |awk '($5==1) {print}' |wc -l
+grep -c HITS_ONLY $guidecover
+grep HITS_ONLY $guidecover |awk '($5>1) {print}' |wc -l
+grep HITS_ONLY $guidecover |awk '($5==1) {print}' |wc -l
+grep -c NOT_FOUND $guidecover
+
+
+# alternative alignment options to the blast..
+
+../src/exonerate-2.2.0-x86_64/bin/exonerate -q dimmitis_ests_entrez_2009-09-29.clusters -t 2009-12-07_GEU-1_velvet-h31_SCF.fasta --model cdna2genome --showvulgar no > dimmitis_ests_entrez_2009-09-29.clusters_on_2009-12-07_GEU-1_velvet-h31_SCF.cdna2genome.exonerate.aln
+
+../bin/x86_64/blat 2009-12-07_GEU-1_velvet-h31_SCF.fasta dimmitis_ests_entrez_2009-09-29.clusters dimmitis_ests_entrez_2009-09-29.clusters_vs_2009-12-07_GEU-1_velvet-h31_SCF.blat.psl
+
+
+# catch contaminants
+
+./catch_contaminants.pl <2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln > 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln.contaminant_filter
+
+wc -l 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln.contaminant_filter
+
+cat 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln.contaminant_filter |sort -k4,4n |awk 'BEGIN {sum =0 } {sum = sum +$4} END { print sum; }'
+
+./catch_contaminants.pl <2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_005305_dimmi_mito.m8.bln > 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_005305_dimmi_mito.m8.bln.contaminant_filter
+
+cut -f 1 cut -f 1 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln.contaminant_filter > 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln.contaminant_filter.ids
+
+grep -w -f 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln.contaminant_filter.ids NC_005305_dimmi_mito_vs_2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.m8.bln |awk '($11 <1e-5) {print}' |sort -k7,7n -k8,8n
+
+grep -w -f 2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_NC_006833.m8.bln.contaminant_filter.ids NC_005305_dimmi_mito_vs_2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF.m8.bln 
+*** no, the wolbachia contigs did not provide the "extra" mito genome hits
+
+./catch_contaminants.pl <2009-12-18_GEU-1-combined-PE_GEU-3-MP_UniquePair_velvet-h35-SCF_vs_Canis_familiaris.BROADD2.56.dna.toplevel.m8.bln
+
+# new tools, same contaminant finding
+
+../src/ncbi-blast-2.2.22+/bin/makeblastdb -in NC_006833.fasta -dbtype nucl 
+
+../src/ncbi-blast-2.2.22+/bin/blastn -num_threads 4 -db NC_006833.fasta -query 2009-12-07_GEU-1_velvet-h31_SCF.fasta -outfmt 6 -out 2009-12-07_GEU-1_velvet-h31_SCF_vs_NC_006833.o6.bln
+
+./catch_contaminants.pl < 2009-12-07_GEU-1_velvet-h31_SCF_vs_NC_006833.o6.bln > 2009-12-07_GEU-1_velvet-h31_SCF_vs_NC_006833.contaminant_filter
+
+cut -f1 2009-12-07_GEU-1_velvet-h31_SCF_vs_NC_006833.contaminant_filter > 2009-12-07_GEU-1_velvet-h31_SCF_vs_NC_006833.contaminant_filter.ids
+
+./src/exonerate-2.2.0-x86_64/bin/fastaremove 2009-12-07_GEU-1_velvet-h31_SCF.fasta 2009-12-07_GEU-1_velvet-h31_SCF_vs_NC_006833.contaminant_filter.ids > 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.fasta
+
+
+# gene finding
+
+../src/augustus/bin/augustus --species=brugia --outfile=2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.gff 2009-12-07_GEU-1_velvet-h31_SCF.fasta 
+
+grep -v \# 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.gff |awk '($3=="gene") { print }' |wc -l
+
+./get_protein_from_augustus_gff.pl < 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.gff > 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.pep
+
+./merge_fasta_and_gff.pl -g 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.augustus.gff3 -f 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.fasta -o 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.augustus.embl -t embl
+
+./gene_structure_stats.pl 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.augustus.embl
+
+# hmmer search
+
+../src/hmmer-3.0b3/binaries/intel-linux-x86_64/hmmsearch --cut_tc -o 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.pfamA.tc.hmmer_out --cpu 2 ../db/Pfam-A.hmm 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.pep
+
+# extract fasta files with an id
+
+*manual cut & paste rectangles from hmmer-PFAM results*
+
+cat 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD.ids 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_memb.ids |sort |uniq|sort >2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD_and_memb.ids
+
+../src/exonerate-2.2.0-x86_64/bin/fastaindex -f 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.pep -i 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.index
+
+../src/exonerate-2.2.0-x86_64/bin/fastafetch -f 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.pep -F -q 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD_and_memb.ids -i 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.index > 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD_and_memb.pep
+
+
+
+
+# structure?
+
+../src/MUMmer3.22/nucmer -p bmws209_vs_2009-12-07_GEU-1_velvet-h31_SCF b_malayi.WS209.dna.fa 2009-12-07_GEU-1_velvet-h31_SCF.fasta
+
+../src/MUMmer3.22/show-coords -r -l bmws209_vs_2009-12-07_GEU-1_velvet-h31_SCF.delta > bmws209_vs_2009-12-07_GEU-1_velvet-h31_SCF.delta.coords
+
+../src/MUMmer3.22/mapview -p bmws209_vs_2009-12-07_GEU-1_velvet-h31_SCF -f pdf  bmws209_vs_2009-12-07_GEU-1_velvet-h31_SCF.delta.coor
+
+# homologs, blastx style
+
+../bin/x86_64/blat -q=protein -t=dnax 2009-12-07_GEU-1_velvet-h31_SCF.fasta wormpep.WS208.fa wormpep.WS208_vs_2009-12-07_GEU-1_velvet-h31_SCF.psl
+
+cut -f 10 wormpep.WS208_vs_2009-12-07_GEU-1_velvet-h31_SCF.psl |sort |uniq -c |wc -l
+
+../bin/x86_64/blat -q=protein -t=dnax 2009-12-07_GEU-1_velvet-h31_SCF.fasta brugpep.WS209.fa brugpep.WS209_vs_2009-12-07_GEU-1_velvet-h31_SCF.psl
+
+cut -f 10 brugpep.WS209_vs_2009-12-07_GEU-1_velvet-h31_SCF.psl |sort |uniq -c |wc -l
+
+# assembly 
+
+svn co https://forge.svn.sourceforge.net/svnroot/forge forge
+
+perl -e 'my $total=0;my $n_containing=0; my $rn=0; while ( my $row=<STDIN> ) { if($rn==0 or $rn==2) { $rn++; next; } elsif ($rn==3) { $rn=0; next; } elsif ($rn==1) { $total++; chomp $row; if ($row=~m/N/){ $n_containing++; $rn++; next; } } } print $n_containing,"/",$total,"\n";' < GEU-1.velvetshuffle.fastq
+
+./qualreap.pl < GEU-1.velvetshuffle.fastq >GEU-1.velvetshuffle.reaped.fastq
+bad 17359483/35637504.
+./qualreap.pl < GEU-7b.velvetshuffle.fastq >GEU-7b.velvetshuffle.reaped.fastq
+bad 3580415/33654920.
+./qualreap.pl < GEU1-090813.velvetshuffle.fastq > GEU-1-090813.velvetshuffle.reaped.fastq
+bad 14443779/23527084.
+
+ ../src/fastx-toolkit/bin/fastx_quality_stats -i GEU-1.velvetshuffle.fastq -o GEU-1.velvetshuffle.fastxqualstats
+
+../src/fastx-toolkit/bin/fastx_reverse_complement -i GEU-7b.velvetshuffle.reaped.fastq -o GEU-7b.velvetshuffle.reaped.revcomp.fastq
+
+../src/velvet_0.7.63/shuffleSequences_fastq.pl 090813_s_5_1_seq_GEU-1.txt 090813_s_5_2_seq_GEU-1.txt GEU1-090813.velvetshuffle.fastq
+
+../src/fastx-toolkit/bin/fastq_quality_trimmer -t 20 -l 0 -i GEU-7b.velvetshuffle.fastq -o GEU-7b.velvetshuffle.endtrimq20.fastq
+
+./qualreap.pl < GEU-1-090813.velvetshuffle.endtrimq20.fastq > GEU-1-090813.velvetshuffle.endtrimq20.noN.fastq
+
+../src/fastx-toolkit/bin/fastx_reverse_complement -i GEU-7b.velvetshuffle.endtrimq20.noN.fastq -o GEU-7b.velvetshuffle.endtrimq20.noN.revcomp.fastq
+
+../src/velvet_0.7.63/velveth --version
+cd ../src/velvet_0.7.63
+make 'MAXKMERLENGTH=35' 'CATEGORIES=3'
+
+../src/velvet_0.7.63/velveth di_GEU-1-2_GEU-7b_endtrim_100603_h35 35 -fastq -shortPaired GEU-1.velvetshuffle.endtrimq20.noN.fastq -fastq -shortPaired2 GEU-1-090813.velvetshuffle.endtrimq20.noN.fastq -fastq -shortPaired3 GEU-7b.velvetshuffle.endtrimq20.noN.revcomp.fastq
+../src/velvet_0.7.63/velvetg di_GEU-1-2_GEU-7b_endtrim_100603_h35 -cov_cutoff 2.2 -ins_length 340 -ins_length_sd 120 -ins_length2 340 -ins_length2_sd 120 -ins_length3 4000 -ins_length3_sd 1600 -exp_cov 16
+
+../src/bowtie-0.12.5/bowtie -p 10 --solexa1.3-quals -3 8 -1 091015_s_1_1_seq_GEU-1.txt -2 091015_s_1_2_seq_GEU-1.txt canFam2 091015_GEU-1_vs_canFam2.bowtie
+
+-----
+
+To test:
+
+blat -minIdentity=92 genome.fa cdna.fa cdna.psl
+blat2hints.pl --in=cdna.psl --out=hints.E.gff
+augustus --species=human --hintsfile=hints.E.gff --extrinsicCfgFile=extrinsic.ME.cfg genome.fa
+
+perl -e 'my $total=0;my $n_containing=0; my $rn=0; while ( my $row=<STDIN> ) { if($rn==0 or $rn==2) { $rn++; next; } elsif ($rn==3) { $rn=0; next; } elsif ($rn==1) { $total++; chomp $row; if ($row=~m/N/){ $n_containing++; $rn++; next; } } } print $n_containing,"/",$total,"\n";' < GEU-1.velvetshuffle.fastq
+
+./qualreap.pl < GEU-1.velvetshuffle.fastq >GEU-1.velvetshuffle.reaped.fastq
+bad 17359483/35637504.
+./qualreap.pl < GEU-7b.velvetshuffle.fastq >GEU-7b.velvetshuffle.reaped.fastq
+bad 3580415/33654920.
+./qualreap.pl < GEU1-090813.velvetshuffle.fastq > GEU-1-090813.velvetshuffle.reaped.fastq
+bad 14443779/23527084.
+./merge_fasta_and_gff.pl -g 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.augustus.gff3 -f 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.fasta -o 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.augustus.embl -t embl
+./gene_structure_stats.pl 2009-12-07_GEU-1_velvet-h31_SCF.no_dWb.augustus.embl
+
+
+
+-----
+
+To test:
+
+blat -minIdentity=92 genome.fa cdna.fa cdna.psl
+blat2hints.pl --in=cdna.psl --out=hints.E.gff
+augustus --species=human --hintsfile=hints.E.gff --extrinsicCfgFile=extrinsic.ME.cfg genome.fa
+
