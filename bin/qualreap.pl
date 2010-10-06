@@ -1,4 +1,7 @@
 #!/usr/bin/perl -w
+#
+# (c) Daniel Nilsson, 2010
+#
 
 my $row;
 my $ncount = 0;
@@ -35,7 +38,7 @@ while ( $row = <STDIN> ) {
 	    print $r0, $r1, $r2, $row;
 	} else {
 	    $badcount++;
-	    print $r0, "N\n", $r2, "A\n";
+#	    print $r0, "N\n", $r2, "A\n";
 	}
 	$bad=0;
     }

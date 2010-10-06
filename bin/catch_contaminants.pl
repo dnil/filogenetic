@@ -1,4 +1,11 @@
 #!/usr/bin/perl  -w 
+#
+# USAGE: catch_contaminants.pl < contigs.bln > contigs.bln.contaminant_filter
+#
+# (c) Daniel Nilsson, 2010 
+#
+
+
 
 my $Evalcutoff = 1e-5;
 my $match_cutoff = 0.4;
