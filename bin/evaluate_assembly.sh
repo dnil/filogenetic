@@ -1,10 +1,12 @@
 #!/bin/bash
 #
-# Daniel Nilsson, 2010
+# (c) Daniel Nilsson, 2010
 #
 # daniel.nilsson@ki.se, daniel.k.nilsson@gmail.com
 #
-# USAGE: evaluate_assembly.sh assembly_contifs_fasta
+# Package released under the Perl Artistic License.
+#
+# USAGE: evaluate_assembly.sh assembly_contigs_fasta
 #
 # Expects: * reference sequences for bmWb and 
 #          * blast+ binaries installed in $BLASTBINDIR
@@ -20,6 +22,101 @@
 #
 # check input environment variables and set unset ones to default values
 
+: <<'POD_INIT'
+
+=head1 NAME
+
+evaluate_assembly.sh - evaluate D. immitis assembly completeness
+
+=head1 AUTHOR
+
+Daniel Nilsson, daniel.nilsson@izb.unibe.ch, daniel.nilsson@ki.se, daniel.k.nilsson@gmail.com
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright 2009, 2010 held by Daniel Nilsson. The package is released for use under the Perl Artistic License.
+
+=head1 SYNOPSIS
+
+USAGE: C<evaluate_assembly.sh contigs.fa>
+
+=head1 DESCRIPTION
+
+Evaluates a filarial worm assembly based on EST completeness coverage stats.
+Also checks for Wolbachia endosymbiont and mitochondrial DNA, calls tentatively calls 
+genes using Augustus, runs a Hmmer3 PFAM screen on the conceptual peptides and checks motif content,
+especially with regard to LGICs.
+
+Uses pipelinefunk.sh - see this for more usage info.
+
+=head1 DEPENDENCIES
+
+Expects:
+
+=over 4
+
+=item * 
+
+Assembly fasta file.
+
+=item *
+          
+blast+, exonerate, Augustus, Hmmer3 and PHRAP installed. Separate ENV environment variables should be set to point to the installations of these. See below.
+
+=item *
+
+BioPerl for gene structure stats.
+
+=item *
+
+PFAM, version suitable for Hmmer3 (e.g. v24).
+
+=item *
+
+Wolbachia genome, DI mito genome, DI ESTs - a version of these should be available in the data dir.
+
+=back
+
+=head1 SHELL ENVIRONMENT VARIABLES
+
+Several environment variables influence the pipeline behaviour.
+
+=over 4
+
+=item BINDIR [path (~/sandbox/filogenetic/bin)]          
+
+Directory where the rest of the tools live.
+
+=item BLASTBINDIR [path (~/src/ncbi-blast-2.2.23+/bin)] 
+
+Directory where the NCBI blast+ binaries reside.
+
+=item EXONERATEBINDIR [path (~/src/exonerate-2.2.0-x86_64/bin)]
+
+Directory where the Exonerate binaries reside.
+
+=item HMMERBINDIR [path (~/src/hmmer-3.0/bin)]
+
+Directory where the Hmmer-3 binaries reside.
+
+=item AUGUSTUSBIN [path (~/src/augustus/bin/augustus)]
+
+Path to the Augustus binary.
+
+=item PHRAPBIN [path (~/src/phrap/phrap)]
+
+Path to the Augustus binary.
+
+=item DBDIR [path (~/db)]
+
+Path to where the databases used can be found. Currently only uses PFAM.
+
+=back
+
+A few more are inherited from pipelinefunk.sh: DIRECTIVE, forceupdate
+
+POD_INIT
+
 if [ -z "$BLASTBINDIR" ]
 then
     BLASTBINDIR=~/src/ncbi-blast-2.2.23+/bin
@@ -27,7 +124,7 @@ fi
 
 if [ -z "$BINDIR" ]
 then
-    BINDIR=~/di/bin
+    BINDIR=~/sandbox/filogenetic/bin
 fi
 
 if [ -z "$EXONERATEBINDIR" ]
@@ -55,52 +152,12 @@ then
     DBDIR=~/db
 fi
 
-# set forceupdate=yes to run all available analyses, even if the file modification times advise against it
-if [ -z "$forceupdate" ]
-then
-    forceupdate=no
-fi
+# For the use of any local perl modules (none for this package yet!)
+#export PERL5LIB=$PERL5LIB:$BINDIR
 
-# set desired number of concurrent processes
-# prefer an already set value of $NPROC, or use nproc to return it if available
-if [ -z "$NPROC" ]
-then
-    NPROCBIN=`which nproc`
-    if [ -x $NPROCBIN ] 
-    then
-	NPROC=`$NPROCBIN`
-    fi
+# uses pipelinefunk.sh for needsUpdate, registerFile, NPROC etc.
 
-    if [ -z "$NPROC" ] 
-    then 
-	NPROC=1
-    fi
-fi
-
-function needsUpdate()
-{
-    # USAGE: needsUpdate(target, prereq [, prereq]*)
-    # return true (needsupdate=yes) if target does not yet exist, is older than its prereqs or forceupdate=yes is in effect.
-
-    needsupdate="no"
-    
-    if [ "$forceupdate" = "yes" ] 
-    then
-	needsupdate="yes"
-    fi
-
-    target=$1;
-    
-    for prereq in ${@:2}
-    do
-	if [ $target -ot $prereq ]
-	then
-	    needsupdate="yes"
-	fi
-    done
-    
-    [ "$needsupdate" = "yes" ]
-}
+. $BINDIR/pipelinefunk.sh
 
 # command line parameters 
 if [ $# -lt 1 ]
@@ -117,6 +174,7 @@ cat /dev/null > $log
 
 # add actual lengths to name, legacy for the % of contig length criteria evaluation
 contigsclen=${contigs}.clen
+registerFile $contigsclen temp
 if needsUpdate $contigsclen $contigs
 then
     $BINDIR/add_length_to_fasta_name.pl < $contigs > ${contigs}.clen
@@ -124,6 +182,13 @@ fi
 
 # generalise to any input species 
 # though other species may need other Evals a.s.o.
+: << 'FUNCTION_DOC'
+
+=head2 separatespecies(mycontigs, ref, species)
+
+Pull apart separate species from the assembly, e.g. mito DNA or endosymbiont DNA.
+
+FUNCTION_DOC
 
 function separatespecies()
 {
@@ -131,22 +196,30 @@ function separatespecies()
     ref=$2
     species=$3
 
+
+    registerFile $ref.nsq temp
+    registerFile $ref.nin temp
+    registerFile $ref.nhr temp
+
     if needsUpdate ${ref}.nsq $ref $BLASTBINDIR/makeblastdb
-    then
+    then    
 	$BLASTBINDIR/makeblastdb -in $ref -dbtype nucl
     fi
-    
+
     mycontigswithout=${mycontigs}.no${species}
 
     mycontigswith=${mycontigs}.${species}
 
     mycontigsbln=${mycontigs}.${species}.of6.bln
 
+    registerFile $bycontigsbln temp
     if needsUpdate $mycontigsbln $mycontigs $BLASTBINDIR/blastn
     then
 	$BLASTBINDIR/blastn -num_threads $NPROC -db $ref -query $mycontigs -outfmt 6 -out $mycontigsbln
     fi
 
+    registerFile $bycontigscf temp
+    registerFile $mycontigscf.ids temp
     mycontigscf=$mycontigs.${species}.contaminant_filter
     if needsUpdate $mycontigscf $mycontigsbln $BINDIR/catch_contaminants.pl
     then
@@ -158,11 +231,13 @@ function separatespecies()
     echo -n "${species} screen found: " >> $log
     cat $mycontigscf |sort -k4,4n |awk 'BEGIN {num = 0 ; sum =0 } {sum = sum +$4 ; num =num+1} END { print num " contigs of total length " sum; }' >> $log
 
+    registerFile $mycontigswithout result
     if needsUpdate $mycontigswithout $mycontigscf $EXONERATEBINDIR/fastaremove
     then
 	$EXONERATEBINDIR/fastaremove $mycontigs ${mycontigscf}.ids > $mycontigswithout    
     fi
 
+    registerFile $mycontigswith result
     if needsUpdate $mycontigswith $mycontigscf $EXONERATEBINDIR/fastafetch
     then
 	if needsUpdate ${mycontigs}.index $mycontigs $EXONERATEBINDIR/fastaindex
@@ -195,6 +270,7 @@ covertest=dimmitis_ests_entrez_2009-09-29.fasta
 
 # cluster..
 clusters=${covertest}.clusters
+registerFile $clusters temp
 if needsUpdate $clusters $covertest $PHRAPBIN
 then
     $PHRAPBIN $covertest -ace
@@ -203,11 +279,15 @@ then
 fi
 
 covertestclen=${clusters}.clen
+registerFile $covertestclen temp
 if needsUpdate $covertestclen $clusters
 then
     $BINDIR/add_length_to_fasta_name.pl < $clusters > $covertestclen
 fi
 
+registerFile ${nuclearcontigs}.nsq temp
+registerFile ${nuclearcontigs}.nin temp
+registerFile ${nuclearcontigs}.nhr temp
 if needsUpdate ${nuclearcontigs}.nsq $ref $BLASTBINDIR/makeblastdb
 then
     $BLASTBINDIR/makeblastdb -in $nuclearcontigs -dbtype nucl
@@ -216,11 +296,13 @@ fi
 guidecover=$covertestclen.$nuclearcontigs.guidecover
 covertestclencontigsbln=${covertestclen}.${nuclearcontigs}.of6.bln
 
+registerfile $covertestclencontigsbln temp 
 if needsUpdate $covertestclencontigsbln $mycontigs $BLASTBINDIR/blastn
 then
     $BLASTBINDIR/blastn -num_threads $NPROC -db $nuclearcontigs -query $covertestclen -outfmt 6 -out $covertestclencontigsbln
 fi
 
+registerFile $guidecover temp
 if needsUpdate $guidecover $covertestclencontigsbln $BINDIR/check_guide_coverage.pl
 then
     $BINDIR/check_guide_coverage.pl < $covertestclencontigsbln > $guidecover
@@ -254,6 +336,7 @@ echo "Total not found: "$(( $totalclust - $foundok )) >> $log
 model=brugia
 augustusgff=${nuclearcontigs}.augustus.$model.gff3
 
+registerFile $augustusgff result
 if needsUpdate $augustusgff $nuclearcontigs $AUGUSTUSBIN 
 then
     echo -n "Start Augustus..."
@@ -264,19 +347,23 @@ fi
 
 grep -v \# $augustusgff |awk 'BEGIN {num=0} ($3=="gene") { num=num+1 } END {print "Augugstus found " num " genes"}' >> $log
 
+
 augustuspep=${augustusgff%%gff3}pep
+registerFile $augustuspep result
 if needsUpdate $augustuspep $augustusgff $BINDIR/get_protein_from_augustus_gff.pl
 then
     $BINDIR/get_protein_from_augustus_gff.pl < $augustusgff > $augustuspep
 fi
 
 augustusembl=${augustusgff%%gff3}embl
+registerFile $augustusembl temp
 if needsUpdate $augustusembl $augustusgff $nuclearcontigs $BINDIR/merge_fasta_and_gff.pl
 then
     $BINDIR/merge_fasta_and_gff.pl -g $augustusgff -f $nuclearcontigs -o $augustusembl -t embl
 fi
 
 genestructurestats=$augustusembl.stats
+registerFile $genestructurestats temp
 if needsUpdate $genestructurestats $augustusembl $BINDIR/gene_structure_stats.pl 
 then
     $BINDIR/gene_structure_stats.pl $augustusembl > $genestructurestats
@@ -292,10 +379,35 @@ cat $genestructurestats >> $log
 # in that case, running LGIC finding/tree construction is rather interesting as well! this also needs hmmer3-filter
 
 hmmerout=$augustuspep.pfamA.tc.hmmer_out
+registerFile $hmmerout result
 if needsUpdate $hmmerout $augustuspep $HMMERBINDIR/hmmsearch
 then
     $HMMERBINDIR/hmmsearch --cut_tc -o $hmmerout --cpu $NPROC $DBDIR/Pfam-A.hmm $augustuspep
 fi
+
+hmmer_all_ids=${hmmerout%%.hmmer_out}.allids
+hmmer_neur_chan_ids=${hmmerout%%.hmmer_out}.neurchan.ids
+hmmer_neur_chan_pep=${hmmerout%%.hmmer_out}.neurchan.pep
+
+registerFile $hmmer_all_ids temp
+registerFile $hmmer_neur_chan_ids temp
+registerFile $hmmer_neur_chan_pep result
+
+if needsUpdate $hmmer_neur_chan_pep $hmmerout $BINDIR/get_hmmersearch_domain_coords.pl
+then
+    $BINDIR/get_hmmer3search_domain_coords.pl $hmmerout > $hmmer_all_ids
+    grep Neur_chan $hmmer_all_ids|cut -f 2  > $hmmer_neur_chan_ids.tmp
+    grep Lig_chan $hmmer_all_ids|cut -f 2  >> $hmmer_neur_chan_ids.tmp
+    sort $hmmer_neur_chan_ids.tmp | uniq > $hmmer_neur_chan_ids
+    
+    $EXONERATEBINDIR/fastaindex -f $augustuspep -i ${augustuspep}.index 
+    $EXONERATEBINDIR/fastafetch -f $augustuspep -F -q $hmmer_neur_chan_ids -i ${augustuspep}.index > ${hmmer_neur_chan_pep}
+
+fi
+
+
+
+
 
 # extract fasta files with an id
 #*manual cut & paste rectangles from hmmer-PFAM results*
