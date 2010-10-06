@@ -184,6 +184,8 @@ fi
 # though other species may need other Evals a.s.o.
 : << 'FUNCTION_DOC'
 
+=head1 FUNCTIONS
+
 =head2 separatespecies(mycontigs, ref, species)
 
 Pull apart separate species from the assembly, e.g. mito DNA or endosymbiont DNA.
@@ -404,14 +406,3 @@ then
     $EXONERATEBINDIR/fastafetch -f $augustuspep -F -q $hmmer_neur_chan_ids -i ${augustuspep}.index > ${hmmer_neur_chan_pep}
 
 fi
-
-
-
-
-
-# extract fasta files with an id
-#*manual cut & paste rectangles from hmmer-PFAM results*
-#cat 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD.ids 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_memb.ids |sort |uniq|sort >2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD_and_memb.ids
-#../src/exonerate-2.2.0-x86_64/bin/fastaindex -f 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.pep -i 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.index
-#../src/exonerate-2.2.0-x86_64/bin/fastafetch -f 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.pep -F -q 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD_and_memb.ids -i 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.index > 2009-12-07_GEU-1_velvet-h31_SCF.augustus_brugia.Neur_chan_LBD_and_memb.pep
-
