@@ -1,7 +1,28 @@
 #!/usr/bin/perl -w
 #
-# Daniel Nilsson, 2010-04-20
+# (c) Daniel Nilsson, 2010-04-20
 #
+#
+# Usage: Usage: markup_exons.pl -i gbkfile [-y output_file_type($def_output_file_type)] -o outputgenbankfile [-t output_file_type($def_output_file_type)] [-W|--warn] [-D|--debug]
+#
+
+=head1 NAME
+
+markup_exons.pl
+
+=head1 AUTHOR
+
+Daniel Nilsson, daniel.nilsson@scilifelab.se, daniel.nilsson@ki.se, daniel.k.nilsson@gmail.com
+
+=head1 LICENSE AND COPYRIGHT
+
+Copyright 2009, 2010 held by Daniel Nilsson. The package is released for use under the Perl Artistic License.
+
+=head1 SYNOPSIS
+
+Usage: markup_exons.pl -i gbkfile [-y output_file_type($def_output_file_type)] -o outputgenbankfile [-t output_file_type($def_output_file_type)] [-W|--warn] [-D|--debug]
+
+=cut
 
 use strict;
 
