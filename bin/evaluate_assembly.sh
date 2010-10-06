@@ -244,6 +244,10 @@ function separatespecies()
     then
 	if needsUpdate ${mycontigs}.index $mycontigs $EXONERATEBINDIR/fastaindex
 	then
+	    if [ -e $mycontigs.index ]
+	    then
+		rm ${mycontigs}.index
+	    fi
 	    $EXONERATEBINDIR/fastaindex -f $mycontigs -i ${mycontigs}.index
 	fi
 
@@ -298,7 +302,7 @@ fi
 guidecover=$covertestclen.$nuclearcontigs.guidecover
 covertestclencontigsbln=${covertestclen}.${nuclearcontigs}.of6.bln
 
-registerfile $covertestclencontigsbln temp 
+registerFile $covertestclencontigsbln temp 
 if needsUpdate $covertestclencontigsbln $mycontigs $BLASTBINDIR/blastn
 then
     $BLASTBINDIR/blastn -num_threads $NPROC -db $nuclearcontigs -query $covertestclen -outfmt 6 -out $covertestclencontigsbln
@@ -402,6 +406,11 @@ then
     grep Lig_chan $hmmer_all_ids|cut -f 2  >> $hmmer_neur_chan_ids.tmp
     sort $hmmer_neur_chan_ids.tmp | uniq > $hmmer_neur_chan_ids
     
+    if [ -e ${augustuspep}.index ] 
+    then
+	rm ${augustuspep}.index
+    fi
+
     $EXONERATEBINDIR/fastaindex -f $augustuspep -i ${augustuspep}.index 
     $EXONERATEBINDIR/fastafetch -f $augustuspep -F -q $hmmer_neur_chan_ids -i ${augustuspep}.index > ${hmmer_neur_chan_pep}
 
