@@ -11,8 +11,10 @@ my @r;
 my $badcount=0;
 my $total=0;
 
-my $expectedmate = 1 ;
-my $pair =1 ;
+my $expectedmate = 1;
+my $pair = 1;
+
+my $matename = "";
 
 while ( $row = <STDIN> ) {
     if ($ncount == 0) {
@@ -24,13 +26,13 @@ while ( $row = <STDIN> ) {
 	    $bad = 1;
 	    if ( $expectedmate == 2 ) {
 		$expectedmate = 1;
-	    }	    
+	    }
 	} else {
 	    #ok! found correct, bad=0, swap expected 
 	    if ($expectedmate == 1) {
 		$expectedmate =2;
 	    } else {
-		$expectedmate =1;
+		$expectedmate =1;		
 	    }
 	}
     } elsif ($ncount == 1 || $ncount==2 ) {
@@ -41,13 +43,21 @@ while ( $row = <STDIN> ) {
 	$total++;
 	if ($bad == 0) {
 	    if( $pair == 2) {
-		print @r, $row;
-		$pair=1;
-		@r =();
+		if ($matename eq substr($r[4],0,-2)) {
+		    print @r, $row;
+		    $pair=1;
+		    @r =();
+		} else {
+		    # actually bad..
+		    $badcount++;
+		    @r=();
+		    $pair=1;
+		}
 	    } else {
 		# first mate ok
 		push @r,$row;
 		$pair=2;
+		$matename = substr($r[0],0,-2);
 	    }
 	} else {
 	    $badcount++;
