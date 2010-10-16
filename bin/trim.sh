@@ -87,6 +87,8 @@ Directory where the velvet binaries reside.
 
 A few more are inherited from pipelinefunk.sh: DIRECTIVE, forceupdate.
 
+=cut
+
 POD_INIT
 
 if [ -z "$FASTXBINDIR" ]
@@ -116,7 +118,7 @@ quallim=20
 # command line parameters 
 if [ $# -lt 2 ]
 then
-        echo "USAGE: ${0##*/} mate1.fastq mate2.fastq"
+        echo "USAGE: ${0##*/} mate1.fastq mate2.fastq [newoutbasename]"
         exit 1
 fi
 
@@ -125,9 +127,14 @@ mate2=$2
 log=$mate1.eval.log
 cat /dev/null > $log
 
-
+outname=$mate1
+if [ $# -eq 3 ]
+then
+    outname=$3
+fi
+ 
 #shuffle 
-velvetshuffle=$mate1.velvetshuffle.fastq
+velvetshuffle=$outname.velvetshuffle.fastq
 registerFile $velvetshuffle result
 if needsUpdate $velvetshuffle $mate1 $mate2 $VELVETBINDIR/shuffleSequences_fastq.pl
 then
