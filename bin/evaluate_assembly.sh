@@ -198,13 +198,26 @@ function separatespecies()
     ref=$2
     species=$3
 
-
     registerFile $ref.nsq temp
     registerFile $ref.nin temp
     registerFile $ref.nhr temp
 
+    if [! -e $ref ]
+    then
+	if [ -e ${0%%bin*}data/$ref ] 
+	then
+	    ln -s ${0%%bin*}data/$ref .	    
+	elif [ -e ${0%%bin*}data/$ref.bz2 ] 
+	then
+	    bunzip2 ${0%%bin*}data/$ref.bz2
+	    ln -s ${0%%bin*}data/$ref .
+	else
+	    echo "OOPS! Reference file $ref not found!"
+	fi
+    fi
+
     if needsUpdate ${ref}.nsq $ref $BLASTBINDIR/makeblastdb
-    then    
+    then
 	$BLASTBINDIR/makeblastdb -in $ref -dbtype nucl
     fi
 
@@ -214,15 +227,16 @@ function separatespecies()
 
     mycontigsbln=${mycontigs}.${species}.of6.bln
 
-    registerFile $bycontigsbln temp
+    registerFile $mycontigsbln temp
     if needsUpdate $mycontigsbln $mycontigs $BLASTBINDIR/blastn
     then
 	$BLASTBINDIR/blastn -num_threads $NPROC -db $ref -query $mycontigs -outfmt 6 -out $mycontigsbln
     fi
 
-    registerFile $bycontigscf temp
-    registerFile $mycontigscf.ids temp
     mycontigscf=$mycontigs.${species}.contaminant_filter
+
+    registerFile $mycontigscf temp
+    registerFile $mycontigscf.ids temp
     if needsUpdate $mycontigscf $mycontigsbln $BINDIR/catch_contaminants.pl
     then
 	$BINDIR/catch_contaminants.pl < $mycontigsbln > $mycontigscf
@@ -273,6 +287,20 @@ nuclearcontigs=${contigsclen}.nodWb.nomito
 
 # evaluate EST coverage
 covertest=dimmitis_ests_entrez_2009-09-29.fasta
+if [ ! -e $covertest ] 
+then
+    # try if it is available in data?
+    if [ -e ${0%%bin*}data/$covertest ] 
+    then
+	ln -s ${0%%bin*}data/$covertest .
+    elif [ -e ${0%%bin*}data/$covertest.bz2 ]
+    then
+	bunzip2 ${0%%bin*}data/$covertest.bz2
+	ln -s ${0%%bin*}data/$covertest .
+    else
+	echo "OOPS! Covertest file $covertest not found!"
+    fi
+fi
 
 # cluster..
 clusters=${covertest}.clusters
@@ -399,7 +427,7 @@ registerFile $hmmer_all_ids temp
 registerFile $hmmer_neur_chan_ids temp
 registerFile $hmmer_neur_chan_pep result
 
-if needsUpdate $hmmer_neur_chan_pep $hmmerout $BINDIR/get_hmmersearch_domain_coords.pl
+if needsUpdate $hmmer_neur_chan_pep $hmmerout $BINDIR/get_hmmer3search_domain_coords.pl
 then
     $BINDIR/get_hmmer3search_domain_coords.pl $hmmerout > $hmmer_all_ids
     grep Neur_chan $hmmer_all_ids|cut -f 2  > $hmmer_neur_chan_ids.tmp
@@ -414,4 +442,5 @@ then
     $EXONERATEBINDIR/fastaindex -f $augustuspep -i ${augustuspep}.index 
     $EXONERATEBINDIR/fastafetch -f $augustuspep -F -q $hmmer_neur_chan_ids -i ${augustuspep}.index > ${hmmer_neur_chan_pep}
 
+    
 fi
