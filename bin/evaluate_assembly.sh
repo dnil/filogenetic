@@ -198,15 +198,13 @@ function separatespecies()
     ref=$2
     species=$3
 
-    registerFile $ref.nsq temp
-    registerFile $ref.nin temp
-    registerFile $ref.nhr temp
-
-    if [! -e $ref ]
+    if [ ! -e $ref ]
     then
-	if [ -e ${0%%bin*}data/$ref ] 
+	echo Could not find $ref. Testing other locations.. 1>&2
+	echo How about ${0%%bin*}data/$ref or ${0%%bin*}data/$ref.bz2? 1>&2
+	if [ -e ${0%%bin*}data/$ref ]
 	then
-	    ln -s ${0%%bin*}data/$ref .	    
+	    ln -s ${0%%bin*}data/$ref .
 	elif [ -e ${0%%bin*}data/$ref.bz2 ] 
 	then
 	    bunzip2 ${0%%bin*}data/$ref.bz2
@@ -215,6 +213,10 @@ function separatespecies()
 	    echo "OOPS! Reference file $ref not found!"
 	fi
     fi
+
+    registerFile $ref.nsq temp
+    registerFile $ref.nin temp
+    registerFile $ref.nhr temp
 
     if needsUpdate ${ref}.nsq $ref $BLASTBINDIR/makeblastdb
     then
@@ -289,6 +291,7 @@ nuclearcontigs=${contigsclen}.nodWb.nomito
 covertest=dimmitis_ests_entrez_2009-09-29.fasta
 if [ ! -e $covertest ] 
 then
+    echo Could not find $covertest. Testing other locations..  >&2 
     # try if it is available in data?
     if [ -e ${0%%bin*}data/$covertest ] 
     then
