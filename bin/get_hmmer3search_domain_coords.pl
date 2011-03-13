@@ -39,6 +39,9 @@ while (my $arg = shift @ARGV) {
 	    } else {
 		$pfamfile = $next_arg;
 	    }
+	} elsif ($arg eq '-D') {
+	    print STDERR "DEBUG mode activated.\n";
+	    $DEBUG = 1;
 	}
     } else {
 	$pfamfile = $arg;
@@ -65,6 +68,7 @@ while (my $l = <PFAMFILE>) {
     
     if ($inentry) {
 
+
 	if( $indomain == 1) {
 
 	    if ($l =~ /\-{5,}\s+\-{5,}/) {
@@ -74,10 +78,12 @@ while (my $l = <PFAMFILE>) {
 #		    print "$identifier\t$name\n";
 	    } elsif ($l =~ m/^\/\//) { 
 		$indomain=0;
-		$inentry=0; 
+		$inentry=0;
 		
 		$name="";
-		$identifier= "";
+		$identifier="";
+		
+		$DEBUG && print "End of entry.\n";
 	    } else {
 		# ignore any "?" flagged lines, below inclusion threshold
 #		$DEBUG && print $l,"\n";
@@ -96,6 +102,13 @@ while (my $l = <PFAMFILE>) {
 	    $identifier =$1;
 	    $desc = $2;
 	    $indomain = 1;
+	} elsif ($l =~ m/^\/\//) { 
+		$inentry=0;
+		
+		$name="";
+		$identifier="";
+		
+		$DEBUG && print "End of entry, no hits found?\n";
 	}
 
     } elsif ($l =~ m/^Query:\s+(\S+)/) { 
