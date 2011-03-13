@@ -8,7 +8,7 @@ my $ncount = 0;
 my $bad = 0;
 my @r;
 
-my $cutoff=35;
+my $cutoff=35; # shortest retained read is cutoff + 1.
 
 my $badcount=0;
 my $total=0;
@@ -18,7 +18,7 @@ while ( $row = <STDIN> ) {
 	$r[$ncount]=$row;
 	$ncount++;
     } elsif ($ncount == 1 || $ncount==5) {
-	if (length($row) < $cutoff+1) {
+	if (length($row) <= $cutoff+1) { # length(row) contains one endline char.
 	    $bad=1;
 	} else {
 	    $r[$ncount] = $row;

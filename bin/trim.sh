@@ -37,7 +37,7 @@ Copyright 2009, 2010 held by Daniel Nilsson. The package is released for use und
 
 =head1 SYNOPSIS
 
-USAGE: C<trim.sh mate1.fastq mate2.fastq>
+USAGE: C<trim.sh mate1.fastq mate2.fastq [outbase]>
 
 =head1 DESCRIPTION
 
@@ -93,7 +93,7 @@ POD_INIT
 
 if [ -z "$FASTXBINDIR" ]
 then
-    BLASTBINDIR=~/src/fastx-toolkit/bin
+    FASTXBINDIR=~/src/fastx-toolkit/bin
 fi
 
 if [ -z "$BINDIR" ]
@@ -106,7 +106,25 @@ then
     VELVETBINDIR=~/src/velvet
 fi
 
-quallim=20
+if [ -z "$truncate" ]
+then 
+    truncate="no"
+fi
+
+if [ -z "$trunclen" ]
+then
+    trunclen=50
+fi
+
+if [ -z "$revcomp" ]
+then
+    revcomp="no"
+fi
+
+if [ -z "$quallim" ]
+then
+    quallim=20
+fi
 
 # For the use of any local perl modules (none for this package yet!)
 #export PERL5LIB=$PERL5LIB:$BINDIR
@@ -124,53 +142,119 @@ fi
 
 mate1=$1
 mate2=$2
-log=$mate1.eval.log
-cat /dev/null > $log
 
 outname=$mate1
 if [ $# -eq 3 ]
 then
     outname=$3
 fi
- 
+
+log=$outname.log
+#cat /dev/null > $log
+rundate=`date`
+echo "$0 $mate1 $mate2 $outname revcomp=$revcomp truncate=$truncate trunclen=$trunclen quallim=$quallim pwd=$PWD ($rundate)" >> $log
+
+updates="no"
+
 #shuffle 
 velvetshuffle=$outname.velvetshuffle.fastq
 registerFile $velvetshuffle result
 if needsUpdate $velvetshuffle $mate1 $mate2 $VELVETBINDIR/shuffleSequences_fastq.pl
 then
-    $VELVETBINDIR/shuffleSequences_fastq.pl $mate1 $mate2 $velvetshuffle
+    $VELVETBINDIR/shuffleSequences_fastq.pl $mate1 $mate2 $velvetshuffle 2>> $log
+    updates="yes"
+fi
+
+#truncate?
+if [ "$truncate" = "yes" ]
+then
+    truncated=${velvetshuffle%%.fastq}.trunc${trunclen}.fastq
+    registerFile $truncated temp
+    if needsUpdate $truncated $velvetshuffle
+    then
+	echo "$FASTXBINDIR/fastx_trimmer -l $trunclen -i $velvetshuffle -o $truncated" >> $log
+	$FASTXBINDIR/fastx_trimmer -l $trunclen -i $velvetshuffle -o $truncated 2>> $log
+	updates="yes"
+    fi
+else
+    truncated=$velevetshuffle
 fi
 
 #endtrim
-endtrim=${velvetshuffle%%.fastq}.endtrimq${quallim}.fastq
-registerFile $entrim temp
-if needsUpdate $endtrim $velvetshuffle
+endtrim=${truncated%%.fastq}.endtrimq${quallim}.fastq
+registerFile $endtrim temp
+if needsUpdate $endtrim $truncated
 then
-    $FASTXBINDIR/fastq_quality_trimmer -t $quallim -l 0 -i $velvetshuffle -o $endtrim
+    echo "$FASTXBINDIR/fastq_quality_trimmer -t $quallim -l 0 -i $truncated -o $endtrim" >> $log
+    $FASTXBINDIR/fastq_quality_trimmer -t $quallim -l 0 -i $truncated -o $endtrim 2>> $log
+    updates="yes"
 fi
 
+# remove N containing reads
 reapN=${endtrim%%.fastq}.noN.fastq
 registerFile $reapN temp
 if needsUpdate $reapN $endtrim $BINDIR/qualreap.pl
 then
-    $BINDIR/qualreap.pl < $endtrim > $reapN
+    echo "$BINDIR/qualreap.pl < $endtrim > $reapN" >> $log
+    $BINDIR/qualreap.pl < $endtrim > $reapN 2>> $log
+    updates="yes"
 fi
 
+# retain only even pairs
 pairsonly=${reapN%%.fastq}.pairsonly.fastq
 registerFile $pairsonly temp
 if needsUpdate $pairsonly $reapN $BINDIR/keeponlypairs.pl
 then
-    $BINDIR/keeponlypairs.pl < $reapN > $pairsonly
+    echo "$BINDIR/keeponlypairs.pl < $reapN > $pairsonly" >>$log
+    $BINDIR/keeponlypairs.pl < $reapN > $pairsonly 2>> $log
+    updates="yes"
 fi
 
+# get rid of pairs with a too short mate
 longenough=${pairsonly%%.fastq}.longenough.fastq
 registerFile $longenough result
 if needsUpdate $longenough $pairsonly $BINDIR/killpairifshort.pl
 then
-    $BINDIR/killpairifshort.pl < $pairsonly > $longenough
+    echo "$BINDIR/killpairifshort.pl < $pairsonly > $longenough" >> $log
+    $BINDIR/killpairifshort.pl < $pairsonly > $longenough 2>> $log
 fi
 
-# ../src/fastx-toolkit/bin/fastx_reverse_complement -i GEU-7b.velvetshuffle.endtrimq20.noN.fastq -o GEU-7b.velvetshuffle.endtrimq20.noN.revcomp.fastq
+if [ "$revcomp" = "yes" ] 
+then 
+    revcomped=${longenough%%.fastq}.revcomp.fastq
+    registerFile $revcomp result
+
+    if needsUpdate $revcomped $longenough
+    then
+	echo "$FASTXBINDIR/fastx_reverse_complement -i $longenough -o $revcomped" >>$log
+	$FASTXBINDIR/fastx_reverse_complement -i $longenough -o $revcomped 2>> $log
+	updates="yes"
+    fi
+fi
+
+#
+if [ "$updates" = "yes" ]
+then
+    final=$longenough 
+    if [ "$revcomp" = "yes" ]
+    then
+	final=$revcomped
+    fi
+
+    echo "Number of incorrect pairs (should always be 0!): " >> $log
+    grep "^@" $final |cut -d\# -f 1 |uniq -c |grep -cv \ 2\  >> $log
+    echo "Total number of reads after trimming: " >> $log
+    grep -c "^@" $final >> $log
+    echo "Total number of bases left after trimming: " >> $log
+    
+    perl -e 'my $total=0; my $n=0; while (<STDIN>) { if ($n ==1) { chomp; $total+=length ; $n++;} elsif ($n == 3) {$n=0 } else {$n++}} print "Found $total bp.\n";' < $final >> $log
+
+    completion=`date`
+    echo "($completion) Project brought up to date." >> $log
+else 
+    echo "Project was already up to date." >> $log
+fi
 
 # STDERR to log?
 
+echo "Done. See log $log for details."
