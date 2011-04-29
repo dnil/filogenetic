@@ -445,5 +445,4 @@ then
     $EXONERATEBINDIR/fastaindex -f $augustuspep -i ${augustuspep}.index 
     $EXONERATEBINDIR/fastafetch -f $augustuspep -F -q $hmmer_neur_chan_ids -i ${augustuspep}.index > ${hmmer_neur_chan_pep}
 
-    
 fi
